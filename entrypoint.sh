@@ -2,6 +2,17 @@
 set -e
 
 # ---------------------------------------------------------------------------
+# Ensure the TUN device node exists (required for WARP tunnel interface)
+# ---------------------------------------------------------------------------
+if [ ! -c /dev/net/tun ]; then
+    echo "[info] Creating /dev/net/tun device node..."
+    mkdir -p /dev/net
+    mknod /dev/net/tun c 10 200
+    chmod 600 /dev/net/tun
+fi
+echo "[info] TUN device ready."
+
+# ---------------------------------------------------------------------------
 # Enable IP forwarding (required for mesh/connector routing)
 # Note: the host sysctl net.ipv4.ip_forward=1 must also be set, OR the
 # container must run with --privileged / the sysctl set in docker-compose.
