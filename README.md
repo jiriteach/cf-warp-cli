@@ -1,2 +1,2 @@
-# -- Cloudflare WARP Client Docker Container
---warp-cli for Mesh Nodes
+# -- Cloudflare WARP CLI Docker Container
+-- Mesh Nodes
