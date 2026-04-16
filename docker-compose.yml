@@ -12,8 +12,9 @@ services:
 
     # Pass IP forwarding through to the container's network namespace.
     # The host must also have net.ipv4.ip_forward=1 set.
-    sysctls:
-      - net.ipv4.ip_forward=1
+    
+    #sysctls:
+    #  - net.ipv4.ip_forward=1
 
     environment:
       # Replace the token below with your actual connector token.
