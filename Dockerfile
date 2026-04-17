@@ -14,7 +14,14 @@ RUN apt-get update && apt-get install -y \
     iputils-ping \
     iptables \
     dbus \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    # Switch to iptables-legacy backend.
+    # Ubuntu 22.04 defaults to iptables-nft which requires nftables kernel
+    # modules that are often unavailable inside containers, causing silent
+    # failures. The legacy backend uses the standard ip_tables module which
+    # is reliably available with NET_ADMIN + NET_RAW capabilities.
+    && update-alternatives --set iptables /usr/sbin/iptables-legacy \
+    && update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
 
 # Install Cloudflare WARP
 RUN curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg \

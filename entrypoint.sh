@@ -13,44 +13,42 @@ fi
 echo "[info] TUN device ready."
 
 # ---------------------------------------------------------------------------
-# Kernel networking — ip_forward and reverse path filtering
+# Kernel networking
 # ---------------------------------------------------------------------------
-sysctl -w net.ipv4.ip_forward=1 2>/dev/null \
-    || echo "[warn] Could not set ip_forward — ensure it is enabled on the host."
+echo "[info] Applying sysctl settings..."
 
-# rp_filter must be disabled on ALL existing interfaces individually, not just
-# 'all' and 'default'. The effective value per interface is MAX(all, <iface>),
-# so setting 'all'=0 alone is not enough if the interface itself is still 1.
-# 'default' only applies to interfaces created AFTER this point (e.g. CloudflareWARP).
-echo "[info] Disabling rp_filter on all interfaces..."
+sysctl -w net.ipv4.ip_forward=1 2>/dev/null \
+    || echo "[warn] Could not set ip_forward."
+
+# Disable rp_filter on every existing interface individually.
+# The effective value per interface is MAX(conf/all, conf/<iface>), so setting
+# conf/all=0 alone is NOT enough — each interface must also be set to 0.
+# conf/default=0 ensures any interface created later (e.g. CloudflareWARP)
+# inherits 0 without needing a separate post-connect step.
 sysctl -w net.ipv4.conf.all.rp_filter=0 2>/dev/null || true
 sysctl -w net.ipv4.conf.default.rp_filter=0 2>/dev/null || true
 for iface in /proc/sys/net/ipv4/conf/*/rp_filter; do
     echo 0 > "$iface" 2>/dev/null || true
 done
-echo "[info] rp_filter disabled."
+
+echo "[info] sysctl settings applied."
 
 # ---------------------------------------------------------------------------
-# iptables — forwarding and masquerade (NAT) rules
+# iptables — forwarding and masquerade rules
 #
-# Docker sets the FORWARD chain policy to DROP and prepends its own rules.
-# Using -A (append) means our ACCEPT lands after Docker's rules and may never
-# be reached for new connections. We use -I (insert) at position 1 to place
-# our rules at the very top of the chain so they are evaluated first.
-#
-# Rules are checked for existence with -C before adding to stay idempotent
-# across container restarts (with network_mode: host, rules survive in the
-# host's iptables between stop/start cycles).
+# Rules are inserted at position 1 (-I) so they sit above Docker's own
+# FORWARD DROP policy rules rather than below them (-A append).
+# Each rule is checked with -C first so restarts don't create duplicates.
 # ---------------------------------------------------------------------------
 echo "[info] Applying iptables rules..."
 
-# Allow all forwarded traffic — inserted at position 1 so it precedes Docker's DROP
 if ! iptables -C FORWARD -j ACCEPT 2>/dev/null; then
     iptables -I FORWARD 1 -j ACCEPT
 fi
 
-# Masquerade all outbound traffic so local subnet hosts reply to the connector's
-# LAN IP rather than the unreachable WARP peer IP — fixing return traffic routing.
+# MASQUERADE rewrites the source IP of forwarded packets to the connector's
+# LAN IP, so local subnet hosts send return traffic back to the connector
+# rather than directly to the unreachable WARP peer address.
 if ! iptables -t nat -C POSTROUTING -j MASQUERADE 2>/dev/null; then
     iptables -t nat -I POSTROUTING 1 -j MASQUERADE
 fi
@@ -73,7 +71,6 @@ echo "[info] Starting warp-svc..."
 warp-svc &
 WARP_SVC_PID=$!
 
-# Give the daemon time to initialise its socket
 echo "[info] Waiting for warp-svc to become ready..."
 for i in $(seq 1 30); do
     if warp-cli --accept-tos status &>/dev/null; then
@@ -105,21 +102,6 @@ fi
 # ---------------------------------------------------------------------------
 echo "[info] Connecting..."
 warp-cli --accept-tos connect
-
-# ---------------------------------------------------------------------------
-# Post-connect: disable rp_filter on the CloudflareWARP tunnel interface.
-# The interface is created by warp-svc after connect and won't exist earlier,
-# so 'default'=0 above ensures it inherits 0, but we set it explicitly too.
-# ---------------------------------------------------------------------------
-echo "[info] Waiting for CloudflareWARP interface..."
-for i in $(seq 1 15); do
-    if [ -d /proc/sys/net/ipv4/conf/CloudflareWARP ]; then
-        sysctl -w net.ipv4.conf.CloudflareWARP.rp_filter=0 2>/dev/null || true
-        echo "[info] rp_filter disabled on CloudflareWARP."
-        break
-    fi
-    sleep 1
-done
 
 echo "[info] WARP mesh connector is up and running."
 
