@@ -70,6 +70,8 @@ configure_firewall() {
 start_dbus() {
   mkdir -p /run/dbus
   rm -f /run/dbus/pid
+  rm -f /run/dbus/system_bus_socket
+  : > /var/log/cloudflare-warp/dbus.stdout.log
 
   if [[ -S /run/dbus/system_bus_socket ]]; then
     log "System D-Bus socket already present"
@@ -81,6 +83,33 @@ start_dbus() {
   DBUS_PID=$!
   tail -n 0 -F /var/log/cloudflare-warp/dbus.stdout.log | log_command_output "[dbus] " &
   DBUS_LOG_TAIL_PID=$!
+}
+
+wait_for_dbus() {
+  local retries="${DBUS_START_TIMEOUT_SECONDS:-15}"
+  local i
+
+  for ((i = 0; i < retries; i++)); do
+    if dbus-send --system \
+      --dest=org.freedesktop.DBus \
+      --type=method_call \
+      --print-reply \
+      /org/freedesktop/DBus \
+      org.freedesktop.DBus.ListNames >/dev/null 2>&1; then
+      log "System D-Bus is ready"
+      return 0
+    fi
+
+    if ! kill -0 "${DBUS_PID}" 2>/dev/null; then
+      log "System D-Bus exited before becoming ready"
+      return 1
+    fi
+
+    sleep 1
+  done
+
+  log "System D-Bus did not become ready within ${retries}s"
+  return 1
 }
 
 start_warp_service() {
@@ -232,6 +261,7 @@ main() {
   configure_forwarding
   configure_firewall
   start_dbus
+  wait_for_dbus
   start_warp_service
   forward_signals
   wait_for_cli
