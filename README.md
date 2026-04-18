@@ -98,3 +98,7 @@ If this is deployed in a cloud VPC, also make sure the instance or VM is allowed
 - Cloudflare Mesh getting started: [Get started with Cloudflare Mesh](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-mesh/get-started/)
 - Cloudflare Mesh overview: [Connect with Cloudflare Mesh](https://developers.cloudflare.com/learning-paths/replace-vpn/connect-private-network/cloudflare-mesh/)
 - Cloudflare routing guidance: [Tips and best practices](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/private-net/warp-connector/tips/)
+
+## CLI compatibility note
+
+Recent Cloudflare WARP releases removed some deprecated `warp-cli` commands. In current releases, use `warp-cli registration show` instead of older `warp-cli account` workflows.

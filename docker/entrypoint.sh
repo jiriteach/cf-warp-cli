@@ -114,7 +114,12 @@ connect_if_requested() {
 }
 
 print_status() {
-  warp-cli --accept-tos account || true
+  if warp-cli --accept-tos registration show >/dev/null 2>&1; then
+    warp-cli --accept-tos registration show || true
+  elif warp-cli --accept-tos registration >/dev/null 2>&1; then
+    warp-cli --accept-tos registration || true
+  fi
+
   warp-cli --accept-tos status || true
 }
 
