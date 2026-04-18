@@ -37,11 +37,4 @@ RUN chmod +x /entrypoint.sh
 # WARP stores its state here — mount a volume to persist registration across restarts
 VOLUME ["/var/lib/cloudflare-warp"]
 
-# Healthcheck: verify WARP reports Connected.
-# start_period gives the container time to register and establish the tunnel
-# before health failures count. If the check fails 3 times the container is
-# marked unhealthy and the watchdog in entrypoint.sh triggers a restart.
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-    CMD warp-cli --accept-tos status 2>/dev/null | grep -q "Connected" || exit 1
-
 ENTRYPOINT ["/entrypoint.sh"]
