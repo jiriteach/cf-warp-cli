@@ -43,6 +43,15 @@ Set your connector token first:
 export WARP_CONNECTOR_TOKEN='your-cloudflare-mesh-token'
 ```
 
+If you are using `network_mode: host`, apply the routing sysctls on the Docker host before starting the container:
+
+```bash
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo sysctl -w net.ipv4.conf.all.forwarding=1
+sudo sysctl -w net.ipv4.conf.all.rp_filter=0
+sudo sysctl -w net.ipv4.conf.default.rp_filter=0
+```
+
 Then start the container:
 
 ```bash
@@ -65,6 +74,8 @@ Use:
 - persisted `/var/lib/cloudflare-warp`
 
 `host` networking is the safest default here because the WARP client manages low-level routing and tunnel interfaces. Running behind Docker bridge NAT is possible in some setups, but it is usually the wrong fit for a routed mesh gateway.
+
+With `host` networking, Docker Compose cannot apply network `sysctls` for the container. Set those on the host instead, or let the entrypoint attempt them if your runtime permits writing `/proc/sys` from inside the container.
 
 ## Verifying
 
